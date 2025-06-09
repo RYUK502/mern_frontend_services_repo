@@ -1,0 +1,19 @@
+/* AdminOrdersPage.css - Modern Colors */
+.admin-orders-container {
+  max-width: 700px;
+  margin: 48px auto 0 auto;
+}
+.pending-table {
+  width: 100%;
+  background: linear-gradient(135deg, #f9fafc 0%, #e0e7ff 100%);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(80, 112, 255, 0.10);
+  border: 1px solid #dde3f8;
+}
+.ant-table-thead > tr > th {
+  background: #6366f1 !important;
+  color: #fff !important;
+}
+.ant-table-tbody > tr > td {
+  background: #f9fafc !important;
+}

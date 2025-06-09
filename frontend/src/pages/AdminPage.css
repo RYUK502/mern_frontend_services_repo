@@ -1,0 +1,18 @@
+/* AdminPage.css - Modern Colors */
+.admin-main {
+  max-width: 900px;
+  margin: 48px auto 0 auto;
+}
+.admin-card {
+  box-shadow: 0 4px 24px rgba(80, 112, 255, 0.10);
+  padding: 2rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f9fafc 0%, #e0e7ff 100%);
+  border: 1px solid #dde3f8;
+}
+.ant-tabs-tab-active {
+  color: #6366f1 !important;
+}
+.ant-tabs-ink-bar {
+  background: linear-gradient(90deg, #6366f1 0%, #60a5fa 100%) !important;
+}

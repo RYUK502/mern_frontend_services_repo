@@ -1,0 +1,83 @@
+/* UserPage.css - Modern, Soft, Responsive */
+body {
+  background: linear-gradient(135deg, #e0e7ff 0%, #f0fdfa 100%);
+  min-height: 100vh;
+  margin: 0;
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+}
+
+.user-main {
+  max-width: 480px;
+  margin: 56px auto 0 auto;
+}
+
+.profile-card {
+  background: linear-gradient(135deg, #f9fafc 0%, #e0e7ff 100%);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px 0 rgba(80,112,255,.10), 0 2px 8px 0 rgba(80,112,255,.08);
+  padding: 2.5rem 2rem 2rem 2rem;
+  border: 1px solid #dde3f8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.profile-avatar {
+  border: 3px solid #6366f1;
+  box-shadow: 0 2px 12px #6366f1aa;
+  margin-bottom: 1.5rem;
+}
+
+.profile-info {
+  text-align: center;
+}
+
+.profile-tags {
+  margin-top: 1rem;
+}
+
+.ant-tag {
+  font-size: 1rem;
+  border-radius: 8px;
+  padding: 0.2em 0.9em;
+  margin-right: 0.5em;
+  background: #f1f5f9;
+  color: #6366f1;
+  border: none;
+  transition: background 0.18s;
+}
+.ant-tag[style*="green"] {
+  background: #d1fae5;
+  color: #059669;
+}
+.ant-tag[style*="orange"] {
+  background: #fef3c7;
+  color: #d97706;
+}
+.ant-tag[style*="red"] {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.ant-tag[style*="blue"] {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.ant-typography {
+  margin-bottom: 0.7em;
+}
+
+.ant-typography-secondary {
+  color: #64748b !important;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .user-main {
+    max-width: 98vw;
+    margin-top: 1.5rem;
+  }
+  .profile-card {
+    padding: 1.2rem 0.5rem;
+  }
+}

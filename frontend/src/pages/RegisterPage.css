@@ -1,0 +1,52 @@
+/* RegisterPage.css - Modern Colors */
+.register-container {
+  max-width: 400px;
+  margin: 80px auto 0 auto;
+  padding: 2rem;
+  background: linear-gradient(135deg, #f9fafc 0%, #e0e7ff 100%);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(80, 112, 255, 0.10);
+  border: 1px solid #dde3f8;
+}
+.register-message {
+  color: #2563eb;
+  font-weight: 700;
+  background: #e0e7ff;
+  border-radius: 6px;
+  padding: 0.5em 1em;
+  margin-bottom: 1em;
+  border: 1px solid #93c5fd;
+}
+input[type="text"], input[type="email"], input[type="password"] {
+  width: 100%;
+  padding: 0.75em 1em;
+  margin-bottom: 1em;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  background: #f1f5ff;
+  font-size: 1rem;
+  transition: border 0.2s, box-shadow 0.2s;
+  outline: none;
+  box-sizing: border-box;
+}
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus {
+  border: 1.5px solid #6366f1;
+  background: #fff;
+  box-shadow: 0 0 0 2px #6366f133;
+}
+
+button, .register-btn {
+  background: linear-gradient(90deg, #6366f1 0%, #60a5fa 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5em 1.5em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+button:hover, .register-btn:hover {
+  background: linear-gradient(90deg, #4338ca 0%, #2563eb 100%);
+}
