@@ -7,7 +7,7 @@ const setupSocket = require('./socket');
 const app = express();
 app.use(require('cors')());
 app.use(express.json());
-app.use('/messages', messageRoutes);
+app.use('/', messageRoutes);
 
 mongoose.connect(process.env.MONGO_URI).then(() => {
   const server = app.listen(process.env.PORT, () => {

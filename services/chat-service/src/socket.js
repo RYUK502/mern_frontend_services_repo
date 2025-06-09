@@ -11,9 +11,20 @@ function setupSocket(server) {
   io.on('connection', socket => {
     console.log('Socket connected:', socket.id);
 
-    socket.on('private_message', ({ senderId, receiverId, content }) => {
-      // Send directly to receiver
-      io.to(receiverId).emit('private_message', { senderId, content });
+    const Message = require('./models/Message');
+
+    socket.on('private_message', async ({ senderId, receiverId, content }) => {
+      // Save message to DB
+      try {
+        const msg = new Message({ senderId, receiverId, content });
+        await msg.save();
+        // Emit to receiver
+        io.to(receiverId).emit('private_message', { senderId, content, createdAt: msg.createdAt });
+        // Optionally, emit to sender for confirmation
+        socket.emit('private_message', { senderId, content, createdAt: msg.createdAt });
+      } catch (err) {
+        console.error('Error saving message:', err);
+      }
     });
 
     socket.on('join', (userId) => {

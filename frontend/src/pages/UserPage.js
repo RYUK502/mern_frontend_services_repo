@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { io } from 'socket.io-client';
+import { getMessages, sendMessage as sendChatMessage, updateMessage, deleteMessage, reactToMessage } from '../api/chatApi';
 import './UserPage.css';
 import { Card, Avatar, Button, Spin, Typography, message, Tag } from 'antd';
 import { LogoutOutlined, UserOutlined } from '@ant-design/icons';
@@ -10,22 +12,48 @@ import Navbar from '../components/Navbar';
 
 const { Title, Paragraph, Text } = Typography;
 
+const CHAT_SERVICE_URL = 'http://localhost:5000';
+const CHAT_NAMESPACE = '/api/messages';
+
 const UserPage = () => {
+  // User state
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Friends state
   const [friends, setFriends] = useState([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
+  
+  // Friend requests state
   const [pendingRequests, setPendingRequests] = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
 
+  // Search state
   const [search, setSearch] = useState("");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState([]);
 
-  const [user, setUser] = useState(null);   
-  const [loading, setLoading] = useState(true);
+  // Chat states
+  const [selectedFriend, setSelectedFriend] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [editingMsgId, setEditingMsgId] = useState(null);
+  const [editContent, setEditContent] = useState('');
+  const [reactingMsgId, setReactingMsgId] = useState(null);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  
+  // Refs
+  const socketRef = useRef(null);
+  const chatBoxRef = useRef(null);
   const navigate = useNavigate();
 
+  // Helper function to get user's reaction to a message
+  const myReaction = (msg) => {
+    return msg.reactions?.find(r => r.userId === user?._id);
+  };
+
+  // Fetch current user info
   useEffect(() => {
-    // Fetch current user info
     const fetchUser = async () => {
       try {
         const res = await getCurrentUser();
@@ -40,13 +68,14 @@ const UserPage = () => {
     fetchUser();
   }, [navigate]);
 
+  // Fetch pending friend requests
   useEffect(() => {
-    // Fetch pending friend requests
     const fetchRequests = async () => {
       setLoadingRequests(true);
       try {
         const res = await getPendingFriendships();
         let requests = res.data;
+        
         // Find requests missing requesterUser
         const missing = requests.filter(r => !r.requesterUser && r.requester);
         if (missing.length > 0) {
@@ -79,6 +108,34 @@ const UserPage = () => {
     fetchRequests();
   }, []);
 
+  // Fetch friends when user is loaded
+  useEffect(() => {
+    if (!user) return;
+    setLoadingFriends(true);
+    getUserFriends(user._id)
+      .then(res => setFriends(res.data))
+      .catch(() => setFriends([]))
+      .finally(() => setLoadingFriends(false));
+  }, [user]);
+
+  // Fetch chat history when friend selected
+  useEffect(() => {
+    if (!user || !selectedFriend) return;
+    setChatLoading(true);
+    getMessages(selectedFriend._id)
+      .then(res => setChatMessages(res.data))
+      .catch(() => setChatMessages([]))
+      .finally(() => setChatLoading(false));
+  }, [selectedFriend, user]);
+
+  // Scroll to bottom on new message
+  useEffect(() => {
+    if (chatBoxRef.current) {
+      chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
+
+  // Handle friend request actions
   const handleAcceptRequest = async (requesterId, requestId) => {
     try {
       await acceptFriendRequest(requesterId);
@@ -99,7 +156,7 @@ const UserPage = () => {
     }
   };
 
-
+  // Handle logout
   const handleLogout = async () => {
     try {
       await logout();
@@ -111,23 +168,7 @@ const UserPage = () => {
     }
   };
 
-  // Fetch friends when user is loaded
-  useEffect(() => {
-    if (!user) return;
-    setLoadingFriends(true);
-    getUserFriends(user._id)
-      .then(res => setFriends(res.data))
-      .catch(() => setFriends([]))
-      .finally(() => setLoadingFriends(false));
-  }, [user]);
-
-  if (loading) {
-    return <div className="flex justify-center items-center h-screen"><Spin size="large" /></div>;
-  }
-
-  if (!user) return null;
-
-
+  // Handle user search
   const handleSearch = async () => {
     if (!search.trim()) return;
     setSearching(true);
@@ -143,53 +184,91 @@ const UserPage = () => {
     }
   };
 
+  // Chat message handlers
+  const handleUpdateMessage = async (msgId) => {
+    try {
+      await updateMessage(msgId, editContent);
+      setChatMessages(prev => prev.map(m => m._id === msgId ? { ...m, content: editContent } : m));
+      setEditingMsgId(null);
+      setEditContent('');
+    } catch {
+      message.error('Failed to update message');
+    }
+  };
+
+  const handleDeleteMessage = async (msgId) => {
+    try {
+      await deleteMessage(msgId);
+      setChatMessages(prev => prev.filter(m => m._id !== msgId));
+    } catch {
+      message.error('Failed to delete message');
+    }
+  };
+
+  const handleReactToMessage = async (msgId, emoji) => {
+    console.log('[ReactToMessage] Attempting to react:', { msgId, emoji });
+    try {
+      await reactToMessage(msgId, emoji);
+      setChatMessages(prev => prev.map(m => 
+        m._id === msgId 
+          ? { 
+              ...m, 
+              reactions: [
+                ...(m.reactions?.filter(r => r.userId !== user._id) || []), 
+                { userId: user._id, emoji }
+              ] 
+            } 
+          : m
+      ));
+      setReactingMsgId(null);
+    } catch (err) {
+      if (err?.response?.status === 404 && err?.response?.data?.message === 'Message not found') {
+        message.error('This message no longer exists or was deleted.');
+      } else {
+        message.error('Failed to react');
+      }
+      console.error('[ReactToMessage] Error:', err);
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (!chatInput.trim() || !selectedFriend) return;
+    const msg = { senderId: user._id, receiverId: selectedFriend._id, content: chatInput };
+    
+    // Emit via Socket.IO
+    if (socketRef.current) {
+      socketRef.current = io('http://localhost:5000/api/messages', {
+        auth: { token: localStorage.getItem('jwt') },
+        transports: ['websocket']
+      });
+      socketRef.current.emit('join', user._id);
+      socketRef.current.emit('private_message', msg);
+    }
+    
+    // Persist via REST
+    sendChatMessage({ receiverId: selectedFriend._id, content: chatInput });
+    setChatInput('');
+  };
+
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <Spin size="large" />
+      </div>
+    );
+  }
+
+  if (!user) return null;
+
   return (
     <>
       <Navbar isAdmin={user.role === 'admin'} onLogout={handleLogout} username={user.username} />
       <div className="user-main">
-        {/* Inbox: Pending Friend Requests */}
-        <div className="friend-inbox-section">
-  <Title level={4} style={{ marginBottom: 8 }}>Friend Requests Inbox</Title>
-  {loadingRequests ? <Spin /> : (
-    pendingRequests.length > 0 ? (
-      <div className="friend-inbox-list">
-        {pendingRequests.map(req => (
-  <Card key={req._id}>
-    <div style={{ marginBottom: 4, fontWeight: 500 }}>
-      Friend request from: <span style={{ color: '#1890ff' }}>
-        {req.requesterUser?.username || req.requester}
-      </span>
-    </div>
-    <Card.Meta
-      avatar={<Avatar src={req.requesterUser?.avatar} icon={<UserOutlined />} />}
-      title={req.requesterUser?.username || req.requester}
-      description={
-        <>
-          {req.requesterUser?.email && (
-            <div style={{ fontSize: 12, color: '#888' }}>{req.requesterUser.email}</div>
-          )}
-          {req.requesterUser?.bio && (
-            <div style={{ fontSize: 12, color: '#888' }}>{req.requesterUser.bio}</div>
-          )}
-        </>
-      }
-    />
-    <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-      <Button type="primary" onClick={() => handleAcceptRequest(req.requester, req._id)}>Accept</Button>
-      <Button danger onClick={() => handleRejectRequest(req.requester, req._id)}>Reject</Button>
-    </div>
-  </Card>
-))}
-      </div>
-    ) : (
-      <Text type="secondary">No incoming friend requests.</Text>
-    )
-  )}
-</div>
+        {/* Profile Card */}
         <div className="profile-card">
           <Avatar size={90} src={user.avatar} icon={<UserOutlined />} className="profile-avatar" />
           <div className="profile-info">
-            <Title level={3} className="mb-0">{user.username}</Title>
+            <Title level={3} className="profile-title">{user.username}</Title>
             <Text type="secondary">{user.email}</Text>
             <div className="profile-tags">
               <Tag color={user.isApproved ? 'green' : 'orange'}>
@@ -200,75 +279,220 @@ const UserPage = () => {
               </Tag>
             </div>
           </div>
-          <Paragraph>
+          <Paragraph className="profile-bio">
             <b>Bio:</b> {user.bio || <Text type="secondary">No bio provided.</Text>}
           </Paragraph>
         </div>
+
         {/* Friends Section */}
-        <div className="friends-section" style={{ marginTop: 24 }}>
+        <div className="friends-section">
           <Title level={4}>Your Friends</Title>
-          {loadingFriends ? <Spin /> : (
-            friends.length > 0 ? (
-              <div className="friends-list">
-                {friends.map(friend => (
-                  <Card key={friend._id} style={{ marginBottom: 8 }}>
-                    <Card.Meta
-                      avatar={<Avatar src={friend.avatar} icon={<UserOutlined />} />}
-                      title={friend.username}
-                      description={friend.email}
-                    />
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Text type="secondary">You have no friends yet.</Text>
-            )
+          {loadingFriends ? (
+            <Spin />
+          ) : friends.length > 0 ? (
+            <div className="friends-list">
+              {friends.map(friend => (
+                <Card 
+                  key={friend._id} 
+                  className={`friend-card${selectedFriend && selectedFriend._id === friend._id ? ' friend-card-selected' : ''}`}
+                  onClick={() => setSelectedFriend(friend)}
+                >
+                  <Card.Meta
+                    avatar={<Avatar src={friend.avatar} icon={<UserOutlined />} />}
+                    title={friend.username}
+                    description={friend.email}
+                  />
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Text type="secondary">You have no friends yet.</Text>
           )}
         </div>
+
+        {/* Chat Section */}
+        {selectedFriend && (
+          <div className="chat-section">
+            <Title level={5}>Chat with {selectedFriend.username}</Title>
+            <div ref={chatBoxRef} className="chat-box">
+              {chatLoading ? (
+                <Spin />
+              ) : chatMessages.length > 0 ? (
+                chatMessages.map((msg, idx) => {
+                  const isSender = msg.senderId === user._id;
+                  return (
+                    <div key={msg._id || idx} className="chat-message">
+                      <div className={`chat-bubble ${isSender ? 'chat-bubble-sender' : 'chat-bubble-receiver'}`}>
+                        {editingMsgId === msg._id ? (
+                          <div className="chat-edit-container">
+                            <input
+                              className="chat-edit-input"
+                              value={editContent}
+                              onChange={e => setEditContent(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') handleUpdateMessage(msg._id);
+                                if (e.key === 'Escape') {
+                                  setEditingMsgId(null);
+                                  setEditContent('');
+                                }
+                              }}
+                            />
+                            <div className="chat-edit-actions">
+                              <Button size="small" type="primary" onClick={() => handleUpdateMessage(msg._id)}>
+                                Save
+                              </Button>
+                              <Button size="small" onClick={() => {
+                                setEditingMsgId(null);
+                                setEditContent('');
+                              }}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="chat-message-content">{msg.content}</span>
+                            {msg.reactions && msg.reactions.length > 0 && (
+                              <div className="chat-reactions">
+                                {msg.reactions.map((reaction, i) => (
+                                  <span key={i} className="chat-reaction">
+                                    {reaction.emoji}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                      <div className="chat-message-actions">
+                        {(msg.senderId === user._id) && (
+                          <>
+                            <Button 
+                              size="small" 
+                              className="chat-action-btn" 
+                              onClick={() => { 
+                                setEditingMsgId(msg._id); 
+                                setEditContent(msg.content); 
+                              }}
+                            >
+                              Edit
+                            </Button>
+                            <Button 
+                              size="small" 
+                              danger 
+                              className="chat-action-btn" 
+                              onClick={() => handleDeleteMessage(msg._id)}
+                            >
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                        <Button 
+                          size="small" 
+                          className="chat-action-btn" 
+                          onClick={() => setReactingMsgId(msg._id)}
+                        >
+                          {myReaction(msg) ? 'Change Reaction' : 'React'}
+                        </Button>
+                      </div>
+                      {reactingMsgId === msg._id && msg._id && (
+                        <div className="chat-emoji-picker">
+                          {["😀","😂","😍","👍","🎉","😢","😡","❤️"].map(e => (
+                            <span
+                              key={e}
+                              className="chat-emoji"
+                              onClick={() => { handleReactToMessage(msg._id, e); }}
+                            >
+                              {e}
+                            </span>
+                          ))}
+                          <Button 
+                            size="small" 
+                            className="chat-action-btn" 
+                            onClick={() => setReactingMsgId(null)}
+                          >
+                            Close
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <Text type="secondary">No messages yet.</Text>
+              )}
+            </div>
+            <div className="chat-input-row">
+              <input
+                className="chat-input-box"
+                type="text"
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleSendMessage(); }}
+                placeholder="Type your message..."
+              />
+              <Button 
+                type="primary" 
+                className="chat-send-btn" 
+                onClick={handleSendMessage} 
+                disabled={!chatInput.trim()}
+              >
+                Send
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* User Search Section */}
         <div className="user-search-section">
           <Title level={4}>Search for Other Users</Title>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <div className="user-search-row">
             <input
+              className="user-search-input"
               type="text"
               placeholder="Enter username..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
-              style={{ flex: 1, padding: 8, borderRadius: 4, border: '1px solid #ccc' }}
             />
-            <Button type="primary" onClick={handleSearch} loading={searching}>Search</Button>
+            <Button 
+              type="primary" 
+              className="user-search-btn" 
+              onClick={handleSearch} 
+              loading={searching}
+            >
+              Search
+            </Button>
           </div>
           {searching && <Spin />}
           {!searching && results.length > 0 && (
-  <div className="search-results">
-    {results.map(u => (
-      <Card key={u._id || u.username} style={{ marginBottom: 8 }}>
-        <Card.Meta
-          avatar={<Avatar src={u.avatar} icon={<UserOutlined />} />}
-          title={u.username}
-        />
-        <Button
-          type="primary"
-          style={{ marginTop: 8 }}
-          onClick={async () => {
-            try {
-              await sendFriendRequest(u._id);
-              message.success(`Friend request sent to ${u.username}`);
-            } catch (err) {
-              message.error(
-                err?.response?.data?.message || `Failed to send request to ${u.username}`
-              );
-            }
-          }}
-        >
-          Send Request
-        </Button>
-      </Card>
-    ))}
-  </div>
-)}
+            <div className="search-results">
+              {results.map(u => (
+                <Card key={u._id || u.username} className="search-result-card">
+                  <Card.Meta
+                    avatar={<Avatar src={u.avatar} icon={<UserOutlined />} />}
+                    title={u.username}
+                  />
+                  <Button
+                    type="primary"
+                    className="send-request-btn"
+                    onClick={async () => {
+                      try {
+                        await sendFriendRequest(u._id);
+                        message.success(`Friend request sent to ${u.username}`);
+                      } catch (err) {
+                        message.error(
+                          err?.response?.data?.message || `Failed to send request to ${u.username}`
+                        );
+                      }
+                    }}
+                  >
+                    Send Request
+                  </Button>
+                </Card>
+              ))}
+            </div>
+          )}
           {!searching && search && results.length === 0 && (
             <Text type="secondary">No users found.</Text>
           )}
