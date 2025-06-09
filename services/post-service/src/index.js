@@ -6,7 +6,7 @@ const app = express();
 app.use(express.json());
 
 const postRoutes = require('./routes/postRoutes');
-app.use('/posts', postRoutes);
+app.use('/', postRoutes);
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {

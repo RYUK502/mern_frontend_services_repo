@@ -4,7 +4,7 @@ import './AdminPage.css';
 import { Table, Button, Avatar, message, Card, Tabs, Spin } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { fetchOrders, approveOrder, rejectOrder } from '../api/adminApi';
-import { fetchPosts, approvePost, rejectPost } from '../api/postApi';
+import { fetchApprovedPosts, fetchPendingPosts, approvePost, rejectPost } from '../api/postApi';
 import { logout } from '../api/authApi';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
@@ -40,7 +40,7 @@ const AdminPage = () => {
   const loadPosts = async () => {
     setPostsLoading(true);
     try {
-      const res = await fetchPosts();
+      const res = await fetchApprovedPosts();
       setPosts(res.data);
     } catch {
       message.error('Failed to fetch posts');

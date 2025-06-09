@@ -23,7 +23,7 @@ app.use('/api/auth', createProxyMiddleware({
 app.use('/api/posts', verifyAuth, createProxyMiddleware({
   target: process.env.POST_URL,
   changeOrigin: true,
-  pathRewrite: { '^/api/posts': '/' }
+  pathRewrite: { '^/api/posts': '/posts' }
 }));
 
 app.use('/api/messages', verifyAuth, createProxyMiddleware({

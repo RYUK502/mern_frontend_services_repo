@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { getMessages, sendMessage as sendChatMessage, updateMessage, deleteMessage, reactToMessage } from '../api/chatApi';
+import { createPost, fetchMyPosts } from '../api/postApi';
 import './UserPage.css';
 import { Card, Avatar, Button, Spin, Typography, message, Tag } from 'antd';
 import { LogoutOutlined, UserOutlined } from '@ant-design/icons';
@@ -16,14 +17,39 @@ const CHAT_SERVICE_URL = 'http://localhost:5000';
 const CHAT_NAMESPACE = '/api/messages';
 
 const UserPage = () => {
+  // --- Post states ---
+  const [postContent, setPostContent] = useState('');
+  const [postMedia, setPostMedia] = useState([]);
+  const [myPosts, setMyPosts] = useState([]);
+  const [loadingMyPosts, setLoadingMyPosts] = useState(false);
+
   // User state
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+
+  // Fetch my posts
+  const fetchMyPostsHandler = async () => {
+    if (!user?._id) return;
+    setLoadingMyPosts(true);
+    try {
+      const res = await fetchMyPosts(user._id);
+      setMyPosts(res.data);
+    } catch {
+      setMyPosts([]);
+    } finally {
+      setLoadingMyPosts(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?._id) fetchMyPostsHandler();
+    // eslint-disable-next-line
+  }, [user?._id]);
+
   // Friends state
   const [friends, setFriends] = useState([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
-  
+
   // Friend requests state
   const [pendingRequests, setPendingRequests] = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
@@ -41,7 +67,7 @@ const UserPage = () => {
   const [reactingMsgId, setReactingMsgId] = useState(null);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
-  
+
   // Refs
   const socketRef = useRef(null);
   const chatBoxRef = useRef(null);
@@ -266,6 +292,77 @@ const UserPage = () => {
       <div className="user-main">
         {/* Profile Card */}
         <div className="profile-card">
+
+        {/* Post Publishing Section */}
+        <div className="post-section">
+          <Title level={4}>Create a Post</Title>
+          <form
+            className="post-form"
+            onSubmit={async e => {
+              e.preventDefault();
+              if (!postContent.trim() && postMedia.length === 0) return;
+              try {
+                let mediaUrls = [];
+                if (postMedia.length > 0) {
+                  // Simulate upload, in real app upload to S3 or server
+                  mediaUrls = Array.from(postMedia).map(f => URL.createObjectURL(f));
+                }
+                await createPost({ content: postContent, media: mediaUrls });
+                setPostContent('');
+                setPostMedia([]);
+                message.success('Post submitted for review!');
+                fetchMyPostsHandler();
+              } catch (err) {
+                message.error('Failed to create post');
+              }
+            }}
+          >
+            <textarea
+              className="post-input"
+              value={postContent}
+              onChange={e => setPostContent(e.target.value)}
+              placeholder="What's on your mind?"
+              rows={3}
+            />
+            <input
+              type="file"
+              className="post-media-input"
+              multiple
+              accept="image/*,video/*"
+              onChange={e => setPostMedia(e.target.files)}
+            />
+            <Button type="primary" htmlType="submit" className="post-submit-btn" disabled={!postContent.trim() && (!postMedia || postMedia.length === 0)}>
+              Publish
+            </Button>
+          </form>
+          <div className="my-posts-list">
+            <Title level={5}>My Posts</Title>
+            {loadingMyPosts ? (
+              <Spin />
+            ) : myPosts.length > 0 ? (
+              myPosts.map(post => (
+                <Card key={post._id} className="my-post-card">
+                  <div className="my-post-content">{post.content}</div>
+                  {post.media && post.media.length > 0 && (
+                    <div className="my-post-media">
+                      {post.media.map((url, idx) => (
+                        <img key={idx} src={url} alt="media" className="my-post-media-img" />
+                      ))}
+                    </div>
+                  )}
+                  <div className="my-post-meta">
+                    <Tag color={post.status === 'approved' ? 'green' : post.status === 'pending' ? 'orange' : 'red'}>
+                      {post.status}
+                    </Tag>
+                  </div>
+                </Card>
+              ))
+            ) : (
+              <Text type="secondary">No posts yet.</Text>
+            )}
+          </div>
+        </div>
+
           <Avatar size={90} src={user.avatar} icon={<UserOutlined />} className="profile-avatar" />
           <div className="profile-info">
             <Title level={3} className="profile-title">{user.username}</Title>

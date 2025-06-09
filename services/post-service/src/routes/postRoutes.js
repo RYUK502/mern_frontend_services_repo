@@ -6,19 +6,28 @@ const {
   deletePost,
   getUserPosts,
   getAllPosts,
-  likePost,
-  unlikePost,
-  getPostStats
+  reactToPost,
+  commentOnPost,
+  getPendingPosts,
+  approvePost,
+  rejectPost
 } = require('../controllers/postController');
 const { verifyToken } = require('../middleware/authMiddleware');
 
+// User routes
 router.post('/', verifyToken, createPost);
 router.put('/:id', verifyToken, updatePost);
 router.delete('/:id', verifyToken, deletePost);
 router.get('/user/:userId', verifyToken, getUserPosts);
 router.get('/', verifyToken, getAllPosts);
-router.post('/:id/like', verifyToken, likePost);
-router.post('/:id/unlike', verifyToken, unlikePost);
-router.get('/:id/stats', verifyToken, getPostStats);
+
+// Comments & Reactions
+router.post('/:id/react', verifyToken, reactToPost);
+router.post('/:id/comment', verifyToken, commentOnPost);
+
+// Admin moderation
+router.get('/admin/pending', verifyToken, getPendingPosts);
+router.post('/admin/:id/approve', verifyToken, approvePost);
+router.post('/admin/:id/reject', verifyToken, rejectPost);
 
 module.exports = router;
