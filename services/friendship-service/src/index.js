@@ -10,6 +10,7 @@ app.use(express.json());
 app.use('/friendships', routes);
 
 mongoose.connect(process.env.MONGO_URI).then(() => {
+  console.log('USER_SERVICE_URL:', process.env.USER_SERVICE_URL);
   app.listen(process.env.PORT, () =>
     console.log(`Friendship service on port ${process.env.PORT}`)
   );

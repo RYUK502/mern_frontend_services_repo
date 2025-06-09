@@ -35,7 +35,7 @@ app.use('/api/messages', verifyAuth, createProxyMiddleware({
 app.use('/api/friendships', verifyAuth, createProxyMiddleware({
   target: process.env.FRIENDSHIP_URL,
   changeOrigin: true,
-  pathRewrite: { '^/api/friendships': '/' }
+  pathRewrite: { '^/api/friendships': '/friendships' }
 }));
 
 // If you have direct API routes handled by the gateway itself, add express.json() AFTER proxies:
