@@ -75,7 +75,7 @@ exports.login = async (req, res) => {
     if (!user.isApproved)
       return res.status(403).json({ message: 'User not approved by admin' });
 
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET);
+    const token = jwt.sign({ id: user._id, role: user.role, isAdmin: user.role === 'admin' }, process.env.JWT_SECRET);
     res.json({ token });
   } catch (err) {
     res.status(401).json({ message: err.message });

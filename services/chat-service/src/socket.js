@@ -2,6 +2,7 @@ const { Server } = require("socket.io");
 
 function setupSocket(server) {
   const io = new Server(server, {
+    path: '/api/messages/socket.io/',
     cors: {
       origin: '*',
       methods: ['GET', 'POST']
@@ -9,6 +10,21 @@ function setupSocket(server) {
   });
 
   io.on('connection', socket => {
+    const jwt = require('jsonwebtoken');
+    const token = socket.handshake.auth?.token;
+    if (!token) {
+      console.log('Socket connection rejected: no token');
+      socket.disconnect();
+      return;
+    }
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      socket.user = decoded;
+    } catch (err) {
+      console.log('Socket connection rejected: invalid token');
+      socket.disconnect();
+      return;
+    }
     console.log('Socket connected:', socket.id);
 
     const Message = require('./models/Message');

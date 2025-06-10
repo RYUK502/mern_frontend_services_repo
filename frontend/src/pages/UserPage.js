@@ -17,6 +17,9 @@ const CHAT_SERVICE_URL = 'http://localhost:5000';
 const CHAT_NAMESPACE = '/api/messages';
 
 const UserPage = () => {
+  // --- Notification state ---
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
   // --- Post states ---
   const [postContent, setPostContent] = useState('');
   const [postMedia, setPostMedia] = useState([]);
@@ -161,6 +164,42 @@ const UserPage = () => {
     }
   }, [chatMessages]);
 
+  // --- Notification Socket.IO listeners ---
+  useEffect(() => {
+    if (!user) return;
+    // Connect socket for notifications (reuse chat socket or create new one)
+    const socket = io(CHAT_SERVICE_URL + CHAT_NAMESPACE, {
+      path: '/api/messages/socket.io/',
+      auth: { token: localStorage.getItem('jwt') },
+      transports: ['websocket']
+    });
+    socket.emit('join', user._id);
+    // Listen for new message from friend
+    socket.on('private_message', msg => {
+      // Always show notification in the bell, even if chat is open
+      if (msg.senderId !== user._id) {
+        setNotifications(prev => [
+          {
+            type: 'message',
+            from: msg.senderUsername || msg.senderId,
+            content: `${msg.senderUsername || msg.senderId} sent you a message`,
+            timestamp: new Date(),
+            read: false
+          },
+          ...prev
+        ]);
+      }
+    });
+    // Listen for new post from friend
+    socket.on('friend_post', post => {
+      setNotifications(prev => [
+        { type: 'post', from: post.username || post.userId, content: post.content, timestamp: new Date(), read: false },
+        ...prev
+      ]);
+    });
+    return () => { socket.disconnect(); };
+  }, [user]);
+
   // Handle friend request actions
   const handleAcceptRequest = async (requesterId, requestId) => {
     try {
@@ -289,6 +328,32 @@ const UserPage = () => {
   return (
     <>
       <Navbar isAdmin={user.role === 'admin'} onLogout={handleLogout} username={user.username} />
+
+      {/* Notifications Section */}
+      <div style={{ position: 'relative', margin: '16px 0' }}>
+        <Button shape="circle" icon={<span role="img" aria-label="bell">🔔</span>} onClick={() => setShowNotifications(s => !s)}>
+          {notifications.some(n => !n.read) && <span style={{ color: 'red', marginLeft: 4 }}>●</span>}
+        </Button>
+        {showNotifications && (
+          <Card title="Notifications" style={{ position: 'absolute', zIndex: 10, width: 320, left: 40 }}>
+            {notifications.length === 0 ? (
+              <Text type="secondary">No notifications</Text>
+            ) : (
+              notifications.slice(0, 10).map((n, idx) => (
+                <div key={idx} style={{ marginBottom: 8, background: n.read ? '#fff' : '#e6f7ff', padding: 8, borderRadius: 4 }}>
+                  <b>{n.type === 'message' ? 'New Message' : 'Friend Post'}</b> from <span style={{ color: '#1890ff' }}>{n.from}</span>:<br />
+                  <span>{n.content}</span>
+                  <div style={{ fontSize: 12, color: '#aaa' }}>{n.timestamp.toLocaleString ? n.timestamp.toLocaleString() : n.timestamp+''}</div>
+                </div>
+              ))
+            )}
+            <Button size="small" onClick={() => setNotifications(notifications.map(n => ({ ...n, read: true })))} style={{ marginTop: 8 }}>
+              Mark all as read
+            </Button>
+          </Card>
+        )}
+      </div>
+
       <div className="user-main">
         {/* Profile Card */}
         <div className="profile-card">
@@ -381,6 +446,40 @@ const UserPage = () => {
           </Paragraph>
         </div>
 
+        {/* Pending Friend Requests Section */}
+        <Card title="Pending Friend Requests" style={{ marginBottom: 24 }}>
+          {loadingRequests ? (
+            <Spin />
+          ) : pendingRequests.length === 0 ? (
+            <Text type="secondary">No pending friend requests.</Text>
+          ) : (
+            pendingRequests.map(req => {
+              const userInfo = req.requesterUser || req.requester || {};
+              return (
+                <div key={req._id} style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                  <Avatar icon={<UserOutlined />} src={userInfo.avatar} style={{ marginRight: 8 }} />
+                  <span style={{ flex: 1 }}>{userInfo.username || userInfo.email || 'Unknown User'}</span>
+                  <Button
+                    type="primary"
+                    size="small"
+                    onClick={() => handleAcceptRequest(userInfo._id, req._id)}
+                    style={{ marginRight: 8 }}
+                  >
+                    Accept
+                  </Button>
+                  <Button
+                    danger
+                    size="small"
+                    onClick={() => handleRejectRequest(userInfo._id, req._id)}
+                  >
+                    Reject
+                  </Button>
+                </div>
+              );
+            })
+          )}
+        </Card>
+
         {/* Friends Section */}
         <div className="friends-section">
           <Title level={4}>Your Friends</Title>
@@ -395,7 +494,7 @@ const UserPage = () => {
                   onClick={() => setSelectedFriend(friend)}
                 >
                   <Card.Meta
-                    avatar={<Avatar src={friend.avatar} icon={<UserOutlined />} />}
+                    avatar={<Avatar src={friend.avatar && !friend.avatar.startsWith('blob:') ? friend.avatar : undefined} icon={<UserOutlined />} />}
                     title={friend.username}
                     description={friend.email}
                   />
@@ -567,7 +666,7 @@ const UserPage = () => {
               {results.map(u => (
                 <Card key={u._id || u.username} className="search-result-card">
                   <Card.Meta
-                    avatar={<Avatar src={u.avatar} icon={<UserOutlined />} />}
+                    avatar={<Avatar src={u.avatar && !u.avatar.startsWith('blob:') ? u.avatar : undefined} icon={<UserOutlined />} />}
                     title={u.username}
                   />
                   <Button

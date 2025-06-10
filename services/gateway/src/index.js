@@ -23,13 +23,19 @@ app.use('/api/auth', createProxyMiddleware({
 app.use('/api/posts', verifyAuth, createProxyMiddleware({
   target: process.env.POST_URL,
   changeOrigin: true,
-  pathRewrite: { '^/api/posts': '/posts' }
+  pathRewrite: { '^/api/posts': '/' }
 }));
 
-app.use('/api/messages', verifyAuth, createProxyMiddleware({
+app.use('/api/messages', createProxyMiddleware({
   target: process.env.CHAT_URL,
   changeOrigin: true,
-  pathRewrite: { '^/api/messages': '/' }
+  ws: true, // Enable WebSocket proxying for Socket.IO
+  pathRewrite: (path, req) => {
+    // Do NOT rewrite for Socket.IO handshake/upgrade
+    if (path.startsWith('/api/messages/socket.io/')) return path;
+    // Rewrite for REST API calls
+    return path.replace(/^\/api\/messages/, '');
+  }
 }));
 
 app.use('/api/friendships', verifyAuth, createProxyMiddleware({
