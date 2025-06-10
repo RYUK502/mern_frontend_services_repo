@@ -1,4 +1,39 @@
 const Post = require('../models/Post');
+const axios = require('axios');
+
+const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://user-service:5001/api/users';
+
+async function enrichPostsWithUsers(posts, token) {
+  if (!posts || posts.length === 0) {
+    return [];
+  }
+
+  const userIds = [...new Set(posts.map(p => p.userId.toString()))];
+  
+  try {
+    const usersResponse = await axios.post(`${USER_SERVICE_URL}/batch`, {
+      ids: userIds
+    }, {
+      headers: { Authorization: token }
+    });
+    
+    const usersMap = usersResponse.data.reduce((acc, user) => {
+      acc[user._id.toString()] = user;
+      return acc;
+    }, {});
+
+    return posts.map(post => ({
+      ...post,
+      user: usersMap[post.userId.toString()] || { username: 'Unknown User', avatar: '' }
+    }));
+  } catch (err) {
+    console.error('Failed to fetch users for posts:', err.message);
+    return posts.map(post => ({ 
+      ...post, 
+      user: { username: 'Unknown User', avatar: '' } 
+    }));
+  }
+}
 
 exports.createPost = async (req, res) => {
   const { content, media } = req.body;
@@ -9,11 +44,20 @@ exports.createPost = async (req, res) => {
 
 exports.updatePost = async (req, res) => {
   const post = await Post.findById(req.params.id);
-  if (!post || post.userId !== req.user.id)
-    return res.status(403).json({ message: 'Not allowed' });
+  if (!post) {
+    return res.status(404).json({ message: 'Post not found' });
+  }
 
-  post.content = req.body.content || post.content;
-  post.media = req.body.media || post.media;
+  // Only author or admin can update
+  if (post.userId !== req.user.id && !(req.user.isAdmin === true || req.user.role === 'admin')) {
+    return res.status(403).json({ message: 'Not allowed' });
+  }
+
+  // Only text content can be edited. Media is permanent.
+  if (req.body.content !== undefined) {
+    post.content = req.body.content;
+  }
+  post.status = 'pending'; // After edit, post should be re-approved by admin
   await post.save();
   res.json(post);
 };
@@ -25,25 +69,36 @@ exports.deletePost = async (req, res) => {
   if (post.userId !== req.user.id && !(req.user.isAdmin === true || req.user.role === 'admin')) {
     return res.status(403).json({ message: 'Not allowed' });
   }
-  await post.remove();
+  await post.deleteOne();
   res.json({ message: 'Post deleted' });
 };
 
 exports.getUserPosts = async (req, res) => {
-  // User can see all their posts, admin can see any user's posts, others only approved
+  let query;
   if (req.user.id === req.params.userId || req.user.isAdmin === true || req.user.role === 'admin') {
-    const posts = await Post.find({ userId: req.params.userId }).sort({ createdAt: -1 });
-    return res.json(posts);
+    query = { userId: req.params.userId };
+  } else {
+    query = { userId: req.params.userId, status: 'approved' };
   }
-  // Others see only approved
-  const posts = await Post.find({ userId: req.params.userId, status: 'approved' }).sort({ createdAt: -1 });
-  res.json(posts);
+  try {
+    const posts = await Post.find(query).sort({ createdAt: -1 }).lean();
+    const enrichedPosts = await enrichPostsWithUsers(posts, req.headers.authorization);
+    res.json(enrichedPosts);
+  } catch (err) {
+    console.error('Error in getUserPosts:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
 };
 
 exports.getAllPosts = async (req, res) => {
-  // Only approved posts are public
-  const posts = await Post.find({ status: 'approved' }).sort({ createdAt: -1 });
-  res.json(posts);
+  try {
+    const posts = await Post.find({ status: 'approved' }).sort({ createdAt: -1 }).lean();
+    const enrichedPosts = await enrichPostsWithUsers(posts, req.headers.authorization);
+    res.json(enrichedPosts);
+  } catch (err) {
+    console.error('Error in getAllPosts:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
 };
 
 // --- Reactions ---
@@ -75,16 +130,18 @@ exports.commentOnPost = async (req, res) => {
 
 // --- Admin Moderation ---
 exports.getPendingPosts = async (req, res) => {
-  console.log('DEBUG req.user:', req.user);
   if (!(req.user.isAdmin === true || req.user.role === 'admin')) {
-    console.log('DEBUG admin check failed:', req.user);
     return res.status(403).json({ message: 'Admin only' });
   }
-  const posts = await Post.find({ status: 'pending' }).sort({ createdAt: -1 });
-  res.json(posts);
+  try {
+    const posts = await Post.find({ status: 'pending' }).sort({ createdAt: -1 }).lean();
+    const enrichedPosts = await enrichPostsWithUsers(posts, req.headers.authorization);
+    res.json(enrichedPosts);
+  } catch (err) {
+    console.error('Error in getPendingPosts:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
 };
-
-const axios = require('axios');
 
 exports.approvePost = async (req, res) => {
   if (!(req.user.isAdmin === true || req.user.role === 'admin')) {

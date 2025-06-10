@@ -25,6 +25,10 @@ export const fetchApprovedPosts = () =>
 export const fetchMyPosts = (userId) =>
   axios.get(`${GATEWAY_BASE_URL}/posts/user/${userId}`, authHeader());
 
+// Update a post (author only)
+export const updatePost = (id, data) =>
+  axios.put(`${GATEWAY_BASE_URL}/posts/${id}`, data, authHeader());
+
 // Delete a post (admin or author)
 export const deletePost = (id) =>
   axios.delete(`${GATEWAY_BASE_URL}/posts/${id}`, authHeader());

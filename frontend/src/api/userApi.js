@@ -11,6 +11,9 @@ export const getUser = (id) => axios.get(`${GATEWAY_BASE_URL}/users/${id}`, auth
 export const updateUser = (id, data) => axios.put(`${GATEWAY_BASE_URL}/users/${id}`, data, authHeader());
 export const deleteUser = (id) => axios.delete(`${GATEWAY_BASE_URL}/users/${id}`, authHeader());
 
+// Get all users (for chat list)
+export const getAllUsers = () => axios.get(`${GATEWAY_BASE_URL}/users`, authHeader());
+
 // Search for users by username (case-insensitive)
 export const searchUsers = (query) =>
   axios.get(`${GATEWAY_BASE_URL}/users/search`, {

@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: __dirname + '/.env' });
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const cors = require('cors');
@@ -24,6 +24,21 @@ app.use('/api/posts', verifyAuth, createProxyMiddleware({
   target: process.env.POST_URL,
   changeOrigin: true,
   pathRewrite: { '^/api/posts': '/' }
+}));
+
+// Proxy media upload and access to post-service
+// Public GET for media files
+app.use('/api/media/uploads', createProxyMiddleware({
+  target: process.env.POST_URL,
+  changeOrigin: true,
+  pathRewrite: { '^/api/media/uploads': '/uploads' }
+}));
+
+// Authenticated for upload and other actions
+app.use('/api/media', verifyAuth, createProxyMiddleware({
+  target: process.env.POST_URL,
+  changeOrigin: true,
+  pathRewrite: { '^/api/media': '/media' }
 }));
 
 app.use('/api/messages', createProxyMiddleware({

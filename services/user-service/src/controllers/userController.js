@@ -1,4 +1,30 @@
 const User = require('../models/User');
+const mongoose = require('mongoose');
+
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find({}, '-password'); // Exclude password field
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+exports.getUserFriends = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    await user.populate('friends', 'username email avatar bio');
+    res.json(user.friends);
+  } catch (err) {
+    console.error('Error in getUserFriends:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
 
 exports.getUser = async (req, res) => {
   try {
@@ -27,6 +53,7 @@ exports.updateProfile = async (req, res) => {
 };
 
 exports.searchUsers = async (req, res) => {
+  console.log('[SEARCH USERS] Query:', req.query.query, '| User:', req.user ? req.user.id : 'No user');
   try {
     const { query } = req.query;
     if (!query || query.trim() === "") {
@@ -101,4 +128,18 @@ exports.removeFriend = async (req, res) => {
   await user.save();
   await friend.save();
   res.json({ message: 'Friend removed' });
+};
+
+exports.getUsersByIds = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ message: 'User IDs array is required' });
+    }
+    const users = await User.find({ '_id': { $in: ids } }).select('username avatar');
+    res.json(users);
+  } catch (err) {
+    console.error('Error in getUsersByIds:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
 };

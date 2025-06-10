@@ -1,0 +1,10 @@
+{
+  "name": "all-services",
+  "private": true,
+  "scripts": {
+    "start-all": "concurrently \"cd user-service && npm start\" \"cd post-service && npm start\" \"cd chat-service && npm start\" \"cd friendship-service && npm start\" \"cd gateway && npm start\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

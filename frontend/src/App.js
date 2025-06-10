@@ -3,7 +3,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import RegisterPage from './pages/RegisterPage';
 import LoginPage from './pages/LoginPage';
-import UserPage from './pages/UserPage';
+import UserPage from './pages/UserPage'; // Now using the new, normal CSS-based UserPage
 import AdminPage from './pages/AdminPage'; // you will create this later
 import ProtectedRoute from './components/ProtectedRoute';
 
