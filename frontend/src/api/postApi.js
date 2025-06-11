@@ -37,9 +37,47 @@ export const deletePost = (id) =>
 export const commentOnPost = (id, content) =>
   axios.post(`${GATEWAY_BASE_URL}/posts/${id}/comment`, { content }, authHeader());
 
-// React to a post
-export const reactToPost = (id, emoji) =>
-  axios.post(`${GATEWAY_BASE_URL}/posts/${id}/react`, { emoji }, authHeader());
+// Like a post
+export const likePost = async (id) => {
+  try {
+    const response = await axios.post(
+      `${GATEWAY_BASE_URL}/posts/${id}/like`,
+      {},
+      authHeader()
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Unlike a post
+export const unlikePost = async (id) => {
+  try {
+    const response = await axios.post(
+      `${GATEWAY_BASE_URL}/posts/${id}/unlike`,
+      {},
+      authHeader()
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Update post likes
+export const updatePostLikes = async (postId, userId, action) => {
+  try {
+    const response = await axios.post(
+      `${GATEWAY_BASE_URL}/posts/${postId}/likes`,
+      { userId, action },
+      authHeader()
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
 
 // Admin: Fetch all pending posts
 export const fetchPendingPosts = () =>

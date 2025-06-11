@@ -34,10 +34,10 @@ function setupSocket(server) {
       try {
         const msg = new Message({ senderId, receiverId, content });
         await msg.save();
-        // Emit to receiver
-        io.to(receiverId).emit('private_message', { senderId, content, createdAt: msg.createdAt });
-        // Optionally, emit to sender for confirmation
-        socket.emit('private_message', { senderId, content, createdAt: msg.createdAt });
+        // Emit to receiver (INCLUDE receiverId in the payload)
+        io.to(receiverId).emit('private_message', { senderId, receiverId, content, createdAt: msg.createdAt });
+        // Optionally, emit to sender for confirmation (INCLUDE receiverId)
+        socket.emit('private_message', { senderId, receiverId, content, createdAt: msg.createdAt });
       } catch (err) {
         console.error('Error saving message:', err);
       }

@@ -1,18 +1,86 @@
 /* MessagesSection.css - extracted from inline styles */
 
 .chat-header-icon {
-  margin-right: 8px;
+  margin-right: 4px;
+  font-size: 1.2rem;
 }
 
 .chat-header-title {
   margin: 0;
+  font-size: 1.1rem;
 }
 
 .back-to-users-btn {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  font-size: 0.9rem;
 }
 
 .selected-friend-title {
   margin: 0;
-  margin-left: 12px;
+  margin-left: 8px;
+  font-size: 1rem;
+}
+
+.chat-message {
+  margin: 4px 0;
+}
+
+.chat-bubble {
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  margin: 4px 0;
+}
+
+.chat-bubble-sender {
+  background: #007bff;
+  color: white;
+  margin-left: auto;
+}
+
+.chat-bubble-receiver {
+  background: #e9ecef;
+  color: #333;
+  margin-right: auto;
+}
+
+.chat-message-content {
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.chat-input-row {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e9ecef;
+}
+
+.chat-input-box {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  resize: none;
+  min-height: 32px;
+  max-height: 100px;
+}
+
+.chat-send-btn {
+  padding: 4px 8px;
+  font-size: 0.9rem;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 16px;
+}
+
+.friend-card {
+  margin-bottom: 8px;
+  padding: 8px;
+}
+
+.friend-card:hover {
+  transform: translateY(-2px);
+  transition: transform 0.2s ease-in-out;
 }

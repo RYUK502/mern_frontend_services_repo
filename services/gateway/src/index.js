@@ -44,14 +44,23 @@ app.use('/api/media', verifyAuth, createProxyMiddleware({
 app.use('/api/messages', createProxyMiddleware({
   target: process.env.CHAT_URL,
   changeOrigin: true,
-  ws: true, // Enable WebSocket proxying for Socket.IO
+  ws: true,
+  on: function (proxy) {
+    proxy.on('error', function (err, req, res) {
+      console.error('Proxy error:', err);
+    });
+  },
   pathRewrite: (path, req) => {
-    // Do NOT rewrite for Socket.IO handshake/upgrade
-    if (path.startsWith('/api/messages/socket.io/')) return path;
+    // Handle Socket.IO v3 paths
+    if (path.startsWith('/api/messages/socket.io/')) {
+      return path.replace('/api/messages/', '/');
+    }
     // Rewrite for REST API calls
     return path.replace(/^\/api\/messages/, '');
   }
 }));
+
+
 
 app.use('/api/friendships', verifyAuth, createProxyMiddleware({
   target: process.env.FRIENDSHIP_URL,

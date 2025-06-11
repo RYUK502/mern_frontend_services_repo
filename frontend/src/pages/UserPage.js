@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { io } from 'socket.io-client';
+
 import { getMessages, sendMessage as sendChatMessage, updateMessage, deleteMessage, reactToMessage } from '../api/chatApi';
-import { createPost, fetchMyPosts, updatePost, deletePost } from '../api/postApi';
+import { fetchMyPosts, updatePost, deletePost } from '../api/postApi';
+import Accueil from '../components/Accueil';
 import './UserPage.css';
 import { Card, Avatar, Button, Spin, Typography, message, Tag } from 'antd';
 import { 
@@ -9,7 +11,6 @@ import {
   UserOutlined, 
   HomeOutlined, 
   MessageOutlined, 
-  BellOutlined, 
   SearchOutlined,
   SettingOutlined,
   HeartOutlined,
@@ -22,31 +23,46 @@ import { getCurrentUser, searchUsers, getUser, getUserFriends, getAllUsers } fro
 import { logout } from '../api/authApi';
 import { useNavigate } from 'react-router-dom';
 import { sendFriendRequest, getPendingFriendships, acceptFriendRequest, rejectFriendRequest } from '../api/friendshipApi';
+import { resolveAvatarUrl } from '../utils/helpers';
 import Navbar from '../components/Navbar';
-import UserNavbar from '../components/UserNavbar';
 import PostCard from '../components/PostCard';
 import MessagesSection from '../components/MessagesSection';
 import UserCard from '../components/UserCard';
 import SearchBar from '../components/SearchBar';
 import ProfilePage from './ProfilePage';
 
+// Helper functions
+const formatTime = (date) => {
+  const now = new Date();
+  const diff = now - date;
+  
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return Math.floor(diff / 60000) + 'm';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h';
+  if (diff < 604800000) return Math.floor(diff / 86400000) + 'd';
+  return date.toLocaleDateString();
+};
+
+const getStatusTag = (status) => {
+  switch (status) {
+    case 'approved':
+      return '✓ Approved';
+    case 'pending':
+      return '⏳ Pending';
+    case 'rejected':
+      return '❌ Rejected';
+    default:
+      return status;
+  }
+};
+
 const { Title, Paragraph, Text } = Typography;
 
 const CHAT_SERVICE_URL = 'http://localhost:5000';
-const CHAT_NAMESPACE = '/api/messages';
-
-function resolveAvatarUrl(avatar) {
-  if (!avatar) return undefined;
-  if (avatar.startsWith('http')) return avatar;
-  // Adjust as needed for your gateway or backend port
-  const base = process.env.REACT_APP_GATEWAY_BASE_URL || 'http://localhost:5000/api';
-  if (avatar.startsWith('/uploads/')) {
-    return `${base}/media${avatar}`;
-  }
-  return avatar;
-}
+const CHAT_NAMESPACE = '/';
 
 const UserPage = () => {
+
   // Section refs for navbar navigation
   const messagesRef = React.useRef(null);
   const profileRef = React.useRef(null);
@@ -80,25 +96,9 @@ const UserPage = () => {
   // --- Navigation state ---
   const [activeNav, setActiveNav] = useState('home');
   
-  // --- Notification state ---
-  const [notifications, setNotifications] = useState([]);
-  
   // --- Friend suggestions ---
   const [friendSuggestions, setFriendSuggestions] = useState([]); // You can implement this dynamically if backend supports
 
-
-  // --- Post states ---
-  const [postContent, setPostContent] = useState('');
-  const [postMedia, setPostMedia] = useState([]);
-  const [myPosts, setMyPosts] = useState([]);
-  const [loadingMyPosts, setLoadingMyPosts] = useState(false);
-
-  // --- Edit Post Modal State ---
-  const [editingPost, setEditingPost] = useState(null);
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editContent, setEditContent] = useState('');
-  const [editMedia, setEditMedia] = useState([]);
-  const [editUploading, setEditUploading] = useState(false);
 
 
   // User state
@@ -185,78 +185,6 @@ const UserPage = () => {
     return <Tag color={color}>{text}</Tag>;
   };
 
-  // Fetch my posts
-  const fetchMyPostsHandler = async () => {
-    if (!user?._id) return;
-    setLoadingMyPosts(true);
-    try {
-      const res = await fetchMyPosts(user._id);
-      setMyPosts(res.data);
-    } catch {
-      setMyPosts([]);
-    } finally {
-      setLoadingMyPosts(false);
-    }
-  };
-
-  // Handle Edit Post (open modal)
-  const handleEditPost = (post) => {
-    setEditingPost(post);
-    setEditContent(post.content);
-    setEditMedia(post.media || []);
-    setEditModalVisible(true);
-  };
-
-  // Handle Edit Media Change
-  const handleEditMediaChange = (e) => {
-    setEditMedia(Array.from(e.target.files));
-  };
-
-  // Handle Save Edit
-  const handleSaveEdit = async () => {
-    if (!editingPost) return;
-    setEditUploading(true);
-    try {
-      let mediaUrls = editingPost.media || [];
-      // If new files are selected, upload them
-      if (editMedia && editMedia.length > 0 && editMedia[0] instanceof File) {
-        const formData = new FormData();
-        Array.from(editMedia).forEach(file => formData.append('media', file));
-        const uploadRes = await fetch(`${process.env.REACT_APP_GATEWAY_BASE_URL || 'http://localhost:5000/api'}/media/upload`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${localStorage.getItem('jwt')}` },
-          body: formData
-        });
-        if (!uploadRes.ok) throw new Error('Upload failed');
-        const uploadData = await uploadRes.json();
-        mediaUrls = uploadData.urls || [];
-      }
-      await updatePost(editingPost._id, { content: editContent, media: mediaUrls });
-      message.success('Post updated');
-      setEditModalVisible(false);
-      setEditingPost(null);
-      setEditContent('');
-      setEditMedia([]);
-      fetchMyPostsHandler();
-    } catch (err) {
-      message.error('Failed to update post');
-    } finally {
-      setEditUploading(false);
-    }
-  };
-
-  // Handle Delete Post
-  const handleDeletePost = async (postId) => {
-    if (!window.confirm('Are you sure you want to delete this post?')) return;
-    try {
-      await deletePost(postId);
-      message.success('Post deleted');
-      fetchMyPostsHandler();
-    } catch {
-      message.error('Failed to delete post');
-    }
-  };
-
   // Fetch friends
   const fetchFriends = async () => {
     if (!user?._id) return;
@@ -306,52 +234,6 @@ const UserPage = () => {
     }
   };
 
-  // Fetch notifications (via socket)
-  useEffect(() => {
-    if (!user) return;
-    // Connect socket for notifications (reuse chat socket or create new one)
-    if (!socketRef.current) {
-      socketRef.current = io(CHAT_SERVICE_URL + CHAT_NAMESPACE, {
-        path: '/api/messages/socket.io/',
-        auth: { token: localStorage.getItem('jwt') },
-        transports: ['websocket']
-      });
-      socketRef.current.emit('join', user._id);
-      socketRef.current.on('private_message', msg => {
-        if (msg.senderId !== user._id) {
-          setNotifications(prev => [{
-            type: 'message',
-            from: msg.senderId,
-            content: msg.content,
-            timestamp: new Date(msg.createdAt),
-            read: false
-          }, ...prev]);
-          // Increment unread count for sender
-          setUnreadCounts(prev => ({
-            ...prev,
-            [msg.senderId]: (prev[msg.senderId] || 0) + 1
-          }));
-          message.info('New message: ' + (msg.content?.slice(0, 50) || ''));
-        }
-      });
-      // Listen for friend request notifications
-      socketRef.current.on('friend_request_received', data => {
-        if (data.recipientId === user._id) {
-          setNotifications(prev => [{
-            type: 'friend_request',
-            from: data.senderId,
-            content: `${data.senderUsername} sent you a friend request`,
-            timestamp: new Date(),
-            read: false
-          }, ...prev]);
-          message.info(`${data.senderUsername} sent you a friend request`);
-          // Optionally refresh pending requests
-          fetchRequests();
-        }
-      });
-    }
-  }, [user]);
-
   // Fetch chat messages when friend is selected
   useEffect(() => {
     const fetchMsgs = async () => {
@@ -374,7 +256,6 @@ const UserPage = () => {
   // Fetch all on user change
   useEffect(() => {
     if (user?._id) {
-      fetchMyPostsHandler();
       fetchFriends();
       fetchRequests();
       fetchAllUsers();
@@ -402,8 +283,7 @@ const UserPage = () => {
     }
   };
 
-  // Remove static feedPosts and use myPosts for feed
-  const feedPosts = myPosts;
+
 
   // Fetch user from backend
   useEffect(() => {
@@ -421,30 +301,7 @@ const UserPage = () => {
     fetchUser();
   }, []);
 
-  // Handle post actions
-  const handleLikePost = (postId) => {
-    setMyPosts(prev => prev.map(post => 
-      post._id === postId 
-        ? { 
-            ...post, 
-            liked: !post.liked,
-            likes: post.liked ? post.likes - 1 : post.likes + 1
-          }
-        : post
-    ));
-  };
 
-  const handleSharePost = (postId) => {
-    setMyPosts(prev => prev.map(post => 
-      post._id === postId 
-        ? { 
-            ...post, 
-            shared: !post.shared,
-            shares: post.shared ? post.shares - 1 : post.shares + 1
-          }
-        : post
-    ));
-  };
 
   // Handle logout
   const handleLogout = async () => {
@@ -458,40 +315,7 @@ const UserPage = () => {
     }
   };
 
-  // Handle post creation
-  const handleCreatePost = async (e) => {
-    e.preventDefault();
-    if (!postContent.trim() && postMedia.length === 0) return;
-    try {
-      let mediaUrls = [];
-      // If there are files, upload them to backend and get URLs
-      if (postMedia.length > 0) {
-        const formData = new FormData();
-        Array.from(postMedia).forEach(file => formData.append('media', file));
-        try {
-          const uploadRes = await fetch(`${process.env.REACT_APP_GATEWAY_BASE_URL || 'http://localhost:5000/api'}/media/upload`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${localStorage.getItem('jwt')}` },
-            body: formData
-          });
-          if (!uploadRes.ok) throw new Error('Upload failed');
-          const uploadData = await uploadRes.json();
-          mediaUrls = uploadData.urls || [];
-        } catch (err) {
-          message.error('Media upload failed. Only text will be posted.');
-          mediaUrls = [];
-        }
-      }
-      // Now create the post in backend
-      await createPost({ content: postContent, media: mediaUrls });
-      setPostContent('');
-      setPostMedia([]);
-      message.success('Post created successfully!');
-      fetchMyPostsHandler();
-    } catch (err) {
-      message.error('Failed to create post');
-    }
-  };
+
 
   // Render navigation menu
   const renderNavigation = () => (
@@ -538,13 +362,7 @@ const UserPage = () => {
         <CameraOutlined className="nav-icon" />
         My Posts
       </div>
-      <div 
-        className={`nav-item ${activeNav === 'settings' ? 'active' : ''}`}
-        onClick={() => setActiveNav('settings')}
-      >
-        <SettingOutlined className="nav-icon" />
-        Settings
-      </div>
+
     </div>
   );
 
@@ -564,9 +382,12 @@ const UserPage = () => {
     // Ensure socket is connected and joined
     if (!socketRef.current) {
       socketRef.current = io(CHAT_SERVICE_URL + CHAT_NAMESPACE, {
-        path: '/api/messages/socket.io/',
+        path: '/api/messages/socket.io',
         auth: { token: localStorage.getItem('jwt') },
-        transports: ['websocket']
+        transports: ['websocket'],
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        upgrade: false // Disable HTTP long-polling
       });
       socketRef.current.emit('join', user._id);
       // Listen for incoming messages
@@ -580,7 +401,6 @@ const UserPage = () => {
     try {
       await sendChatMessage({ receiverId: selectedFriend._id, content: msg.content });
     } catch (err) {
-      message.error('Failed to send message to server');
     }
     // Scroll chat box to bottom after sending
     setTimeout(() => {
@@ -597,85 +417,8 @@ const UserPage = () => {
     }
     switch (activeNav) {
       case 'home':
-        console.log('Post creation avatar:', user?.avatar);
         return (
-          <>
-            {/* Post Creation */}
-            <div className="post-creation">
-              <div className="post-creation-header">
-                <Avatar 
-                  src={resolveAvatarUrl(user?.avatar)} 
-                  icon={<UserOutlined />} 
-                  size={40}
-                  className="post-creation-avatar"
-                />
-                <Text strong>What's on your mind, {user?.username}?</Text>
-              </div>
-              <div className="post-form" onSubmit={handleCreatePost}>
-                <textarea
-                  className="post-input"
-                  value={postContent}
-                  onChange={e => setPostContent(e.target.value)}
-                  placeholder="Share your thoughts..."
-                />
-                <div className="post-actions">
-                  <input
-                    type="file"
-                    className="post-media-input"
-                    multiple
-                    accept="image/*,video/*"
-                    onChange={e => setPostMedia(Array.from(e.target.files))}
-                    style={{ display: 'none' }}
-                    id="media-upload"
-                  />
-                  <label htmlFor="media-upload" className="post-media-input">
-                    <CameraOutlined /> Add Photos/Videos
-                  </label>
-                  <Button 
-                    type="primary" 
-                    onClick={handleCreatePost}
-                    className="post-submit-btn"
-                    disabled={!postContent.trim() && (!postMedia || postMedia.length === 0)}
-                  >
-                    Post
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Posts Feed */}
-            <div className="posts-feed">
-              {feedPosts.map(post => {
-  let authorObj = post.author;
-  if (authorObj && typeof authorObj === 'string') {
-    if (!window._userCache) window._userCache = {};
-    if (!window._userCache[authorObj]) {
-      getUser(authorObj).then(res => {
-        window._userCache[authorObj] = res.data;
-        setMyPosts(posts => [...posts]);
-      }).catch(() => {
-        window._userCache[authorObj] = { username: 'Unknown' };
-      });
-      authorObj = { username: 'Loading...' };
-    } else {
-      authorObj = window._userCache[authorObj];
-    }
-  }
-  return (
-    <PostCard
-      key={post._id}
-      post={post}
-      authorObj={authorObj}
-      onEdit={handleEditPost}
-      onDelete={handleDeletePost}
-      formatTime={formatTime}
-      getStatusTag={getStatusTag}
-    />
-  );
-})}
-
-            </div>
-          </>
+          <Accueil user={user} />
         );
 
       case 'messages':
@@ -730,51 +473,7 @@ const UserPage = () => {
         return (
           <div className="my-posts-section">
             <Title level={4}>My Posts</Title>
-            {loadingMyPosts ? (
-              <div className="flex-center" style={{ padding: 40 }}>
-                <Spin size="large" />
-              </div>
-            ) : myPosts.length > 0 ? (
-              <div className="my-posts-list">
-                {myPosts.map(post => (
-                  <Card key={post._id} className="my-post-card">
-                    <div className="my-post-content">{post.content}</div>
-                    {post.media && post.media.length > 0 && (
-                      <div className="my-post-media">
-                        {post.media.map((url, idx) => {
-                          let displayUrl = url;
-                          if (url && url.startsWith('http://localhost:5003/uploads/')) {
-                            const filename = url.split('/uploads/')[1];
-                            displayUrl = `${process.env.REACT_APP_GATEWAY_BASE_URL || 'http://localhost:5000/api'}/media/uploads/${filename}`;
-                          }
-                          return <img key={idx} src={displayUrl} alt="media" className="my-post-media-img" />;
-                        })}
-                      </div>
-                    )}
-                    <div className="my-post-meta" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div>
-                        <Text type="secondary">{formatTime(new Date(post.createdAt))} {getStatusTag(post.status)}</Text>
-                        <Tag color={post.status === 'approved' ? 'green' : post.status === 'pending' ? 'orange' : 'red'} style={{ marginLeft: 8 }}>
-                          {post.status}
-                        </Tag>
-                      </div>
-                      <div>
-                        <Button size="small" style={{ marginRight: 8 }} onClick={() => handleEditPost(post)}>
-                          Edit
-                        </Button>
-                        <Button size="small" danger onClick={() => handleDeletePost(post._id)}>
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="flex-center" style={{ padding: 40 }}>
-                <Text type="secondary">You haven't created any posts yet.</Text>
-              </div>
-            )}
+            <Accueil user={user} />
           </div>
         );
 
@@ -806,7 +505,6 @@ const UserPage = () => {
                       onClick={async () => {
                         try {
                           await sendFriendRequest(u._id);
-                          message.success(`Friend request sent to ${u.username}`);
                           if (socketRef.current) {
                             socketRef.current.emit('friend_request', {
                               senderId: user._id,
@@ -816,10 +514,6 @@ const UserPage = () => {
                           }
                         } catch (err) {
                           console.error('Friend request error:', err?.response?.data || err);
-                          message.error(
-                            err?.response?.data?.message ||
-                            'Failed to send friend request'
-                          );
                         }
                       }}
                     >
@@ -905,74 +599,7 @@ const UserPage = () => {
   
         {/* Right Sidebar */}
         <div className="right-sidebar">
-          {/* Notifications Panel */}
-          <div className="notifications-panel">
-            <div className="notifications-header">
-              <span className="notifications-title">
-                <BellOutlined style={{ marginRight: 8 }} />
-                Notifications
-              </span>
-              {notifications.some(n => !n.read) && (
-                <span className="notification-badge">
-                  {notifications.filter(n => !n.read).length}
-                </span>
-              )}
-            </div>
-            <div className="notifications-list">
-              {notifications.slice(0, 5).map((notification, idx) => (
-                <div 
-                  key={idx} 
-                  className={`notification-item ${!notification.read ? 'unread' : ''}`}
-                >
-                  <Avatar 
-                    size={32} 
-                    icon={<UserOutlined />} 
-                    className="notification-avatar"
-                  />
-                  <div className="notification-content">
-                    <div className="notification-text">
-                      <strong>{notification.from || 'User'}</strong> {notification.content}
-                    </div>
-                    <div className="notification-time">
-                      {formatTime(notification.timestamp)}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-  
-          {/* Friend Suggestions */}
-          <div className="friend-suggestions">
-            <Title level={5}>People You May Know</Title>
-            <div className="suggestions-list">
-              {friendSuggestions.map(suggestion => (
-                <div key={suggestion._id} className="suggestion-item">
-                  <Avatar 
-                    src={suggestion.avatar} 
-                    icon={<UserOutlined />} 
-                    size={40}
-                  />
-                  <div className="suggestion-info">
-                    <div className="suggestion-name">{suggestion.username}</div>
-                    <div className="suggestion-mutual">
-                      {suggestion.mutualFriends} mutual friends
-                    </div>
-                  </div>
-                  <Button 
-                    type="primary" 
-                    size="small"
-                    className="suggestion-action"
-                    onClick={() => message.success(`Friend request sent to ${suggestion.username}`)}
-                  >
-                    Add
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-  
-          {/* Pending Friend Requests */}
+          {/* Friend Requests */}
           {pendingRequests.length > 0 && (
             <div className="pending-requests">
               <Title level={5}>Friend Requests</Title>
@@ -982,7 +609,7 @@ const UserPage = () => {
                   <div key={req._id} className="request-item">
                     <Avatar 
                       icon={<UserOutlined />} 
-                      src={userInfo.avatar} 
+                      src={resolveAvatarUrl(userInfo.avatar)} 
                       size={40}
                     />
                     <div className="request-info">

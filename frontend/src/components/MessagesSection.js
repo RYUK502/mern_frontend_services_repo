@@ -27,7 +27,7 @@ const MessagesSection = ({
     </div>
     {selectedFriend ? (
       <>
-        <Button onClick={() => setSelectedFriend(null)} className="back-to-users-btn">Back to users</Button>
+        <Button onClick={() => setSelectedFriend(null)} className="back-to-users-btn">Back to friends</Button>
         <div className="chat-header">
           <Avatar src={selectedFriend.avatar} icon={<UserOutlined />} />
           <Title level={5} className="selected-friend-title">{selectedFriend.username}</Title>

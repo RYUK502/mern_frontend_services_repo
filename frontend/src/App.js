@@ -1,6 +1,6 @@
 // src/App.js
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import RegisterPage from './pages/RegisterPage';
 import LoginPage from './pages/LoginPage';
 import UserPage from './pages/UserPage'; // Now using the new, normal CSS-based UserPage
@@ -8,21 +8,19 @@ import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage'; // you will create this later
 import ProtectedRoute from './components/ProtectedRoute';
 
-import { useNavigate } from 'react-router-dom';
-
 function App() {
   const [user, setUser] = React.useState(null);
 
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={<LoginWithRedirect setUser={setUser} />} />
+        <Route path="/login" element={<LoginWithRedirect />} />
         <Route path="/register" element={<RegisterWithRedirect />} />
         <Route
-          path="/:username"
+          path=":username"
           element={
             <ProtectedRoute>
-              <UserPage user={user} setUser={setUser} useUserNavbar={true} />
+              <UserPage />
             </ProtectedRoute>
           }
         />
@@ -30,7 +28,7 @@ function App() {
           path="/profile"
           element={
             <ProtectedRoute>
-              <ProfilePage user={user} setUser={setUser} />
+              <ProfilePage />
             </ProtectedRoute>
           }
         />
@@ -59,6 +57,7 @@ function LoginWithRedirect() {
       navigate(`/${username}`);
     }
   };
+
   return (
     <LoginPage
       onLoginSuccess={handleLoginSuccess}
