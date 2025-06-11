@@ -9,6 +9,16 @@ export const getCurrentUser = () => axios.get(`${GATEWAY_BASE_URL}/auth/me`, aut
 
 export const getUser = (id) => axios.get(`${GATEWAY_BASE_URL}/users/${id}`, authHeader());
 export const updateUser = (id, data) => axios.put(`${GATEWAY_BASE_URL}/users/${id}`, data, authHeader());
+export const updateCurrentUser = (data) => axios.put(`${GATEWAY_BASE_URL}/users/me`, data, authHeader());
+
+export const uploadAvatar = (file) => {
+  const formData = new FormData();
+  formData.append('avatar', file);
+  return axios.post(`${GATEWAY_BASE_URL}/users/me/avatar`, formData, {
+    ...authHeader(),
+    headers: { 'Content-Type': 'multipart/form-data', ...authHeader().headers }
+  });
+};
 export const deleteUser = (id) => axios.delete(`${GATEWAY_BASE_URL}/users/${id}`, authHeader());
 
 // Get all users (for chat list)

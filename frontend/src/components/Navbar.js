@@ -4,13 +4,13 @@ import { Button } from 'antd';
 import { LogoutOutlined, UserOutlined, HomeOutlined } from '@ant-design/icons';
 import './Navbar.css';
 
-const Navbar = ({ isAdmin, onLogout, username }) => {
+const Navbar = ({ isAdmin, onLogout, username, onNavigate }) => {
   const navigate = useNavigate();
   return (
     <nav className="navbar">
       <div className="navbar-left">
         <Link to={isAdmin ? "/admin" : "/user"} className="navbar-logo">
-          <HomeOutlined style={{ fontSize: 22, marginRight: 8 }} />
+          <HomeOutlined className="navbar-home-icon" />
           <span className="navbar-title">PrivetNet</span>
         </Link>
       </div>
@@ -22,14 +22,16 @@ const Navbar = ({ isAdmin, onLogout, username }) => {
           </>
         ) : (
           <>
-            <Link to="/user" className="navbar-link">Profile</Link>
-            <Link to="/user" className="navbar-link">Feed</Link>
+            <Button className="navbar-link" onClick={() => onNavigate && onNavigate('messages')}>Messages</Button>
+            <Button className="navbar-link" onClick={() => onNavigate && onNavigate('profile')}>Profile</Button>
+            <Button className="navbar-link" onClick={() => onNavigate && onNavigate('friends')}>Friends</Button>
+            <Button className="navbar-link" onClick={() => onNavigate && onNavigate('discover')}>Discover</Button>
           </>
         )}
       </div>
       <div className="navbar-right">
         <span className="navbar-username">
-          <UserOutlined style={{ marginRight: 4 }} />
+          <UserOutlined className="navbar-user-icon" />
           {username}
         </span>
         <Button

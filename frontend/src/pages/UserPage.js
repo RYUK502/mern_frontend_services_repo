@@ -23,13 +23,60 @@ import { logout } from '../api/authApi';
 import { useNavigate } from 'react-router-dom';
 import { sendFriendRequest, getPendingFriendships, acceptFriendRequest, rejectFriendRequest } from '../api/friendshipApi';
 import Navbar from '../components/Navbar';
+import UserNavbar from '../components/UserNavbar';
+import PostCard from '../components/PostCard';
+import MessagesSection from '../components/MessagesSection';
+import UserCard from '../components/UserCard';
+import SearchBar from '../components/SearchBar';
+import ProfilePage from './ProfilePage';
 
 const { Title, Paragraph, Text } = Typography;
 
 const CHAT_SERVICE_URL = 'http://localhost:5000';
 const CHAT_NAMESPACE = '/api/messages';
 
+function resolveAvatarUrl(avatar) {
+  if (!avatar) return undefined;
+  if (avatar.startsWith('http')) return avatar;
+  // Adjust as needed for your gateway or backend port
+  const base = process.env.REACT_APP_GATEWAY_BASE_URL || 'http://localhost:5000/api';
+  if (avatar.startsWith('/uploads/')) {
+    return `${base}/media${avatar}`;
+  }
+  return avatar;
+}
+
 const UserPage = () => {
+  // Section refs for navbar navigation
+  const messagesRef = React.useRef(null);
+  const profileRef = React.useRef(null);
+  const friendsRef = React.useRef(null);
+  const discoverRef = React.useRef(null);
+
+  // Handler for navbar navigation
+  const handleNavbarNavigate = (section) => {
+    let ref = null;
+    switch (section) {
+      case 'messages':
+        ref = messagesRef;
+        break;
+      case 'profile':
+        ref = profileRef;
+        break;
+      case 'friends':
+        ref = friendsRef;
+        break;
+      case 'discover':
+        ref = discoverRef;
+        break;
+      default:
+        break;
+    }
+    if (ref && ref.current) {
+      ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   // --- Navigation state ---
   const [activeNav, setActiveNav] = useState('home');
   
@@ -450,6 +497,13 @@ const UserPage = () => {
   const renderNavigation = () => (
     <div className="nav-menu">
       <div 
+        className={`nav-item ${activeNav === 'profile' ? 'active' : ''}`}
+        onClick={() => setActiveNav('profile')}
+      >
+        <UserOutlined className="nav-icon" />
+        Profile
+      </div>
+      <div 
         className={`nav-item ${activeNav === 'home' ? 'active' : ''}`}
         onClick={() => setActiveNav('home')}
       >
@@ -538,15 +592,19 @@ const UserPage = () => {
 
   // Render main content based on active navigation
   const renderMainContent = () => {
+    if (activeNav === 'profile') {
+      return <ProfilePage user={user} setUser={setUser} />;
+    }
     switch (activeNav) {
       case 'home':
+        console.log('Post creation avatar:', user?.avatar);
         return (
           <>
             {/* Post Creation */}
             <div className="post-creation">
               <div className="post-creation-header">
                 <Avatar 
-                  src={user?.avatar || undefined} 
+                  src={resolveAvatarUrl(user?.avatar)} 
                   icon={<UserOutlined />} 
                   size={40}
                   className="post-creation-avatar"
@@ -588,98 +646,34 @@ const UserPage = () => {
             {/* Posts Feed */}
             <div className="posts-feed">
               {feedPosts.map(post => {
-                // Support: post.author may be an object or just an ID
-                let authorObj = post.author;
-                if (authorObj && typeof authorObj === 'string') {
-                  // Try to get from cache or fetch
-                  if (!window._userCache) window._userCache = {};
-                  if (!window._userCache[authorObj]) {
-                    // Fire-and-forget fetch, will update on next render
-                    getUser(authorObj).then(res => {
-                      window._userCache[authorObj] = res.data;
-                      // Force re-render
-                      setMyPosts(posts => [...posts]);
-                    }).catch(() => {
-                      window._userCache[authorObj] = { username: 'Unknown' };
-                    });
-                    authorObj = { username: 'Loading...' };
-                  } else {
-                    authorObj = window._userCache[authorObj];
-                  }
-                }
-                // Explicitly return JSX here
-                return (
-                  <div key={post._id} className="post-card">
-                    <div className="post-header">
-                      <Avatar 
-                        src={authorObj?.avatar || undefined} 
-                        icon={<UserOutlined />} 
-                        size={40}
-                      />
-                      <div className="post-author-info">
-                        <div className="post-author-name">{authorObj?.username || 'Unknown'}</div>
-                        <div className="post-time">{formatTime(post.timestamp)}</div>
-                      </div>
-                    </div>
-                    <div className="post-content">{post.content}</div>
-                    {post.media && post.media.length > 0 && (
-  <div className="post-media">
-    {post.media.map((url, idx) => {
-      const isBlobUrl = url && url.startsWith('blob:');
-      // Rewrite backend media URLs to go through the gateway
-      let displayUrl = url;
-      if (url && url.startsWith('http://localhost:5003/uploads/')) {
-        const filename = url.split('/uploads/')[1];
-        displayUrl = `${process.env.REACT_APP_GATEWAY_BASE_URL || 'http://localhost:5000/api'}/media/uploads/${filename}`;
-      }
-      return isBlobUrl ? (
-        <div key={idx} className="post-media-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', color: '#aaa', fontSize: 16 }}>
-          <span role="img" aria-label="broken">🚫</span>
-        </div>
-      ) : (
-        displayUrl.match(/\.(mp4|webm|ogg)$/i) ? (
-          <video key={idx} src={displayUrl} controls className="post-media-item" style={{ objectFit: 'cover' }} />
-        ) : (
-          <img key={idx} src={displayUrl} alt="post media" className="post-media-item" />
-        )
-      );
-    })}
-  </div>
-)}
-                    <div className="post-actions">
-  <div 
-    className={`post-action ${post.liked ? 'liked' : ''}`}
-    onClick={() => handleLikePost(post._id)}
-  >
-    <HeartOutlined />
-    <span>{post.likes}</span>
-  </div>
-  <div className="post-action">
-    <CommentOutlined />
-    <span>{post.comments}</span>
-  </div>
-  <div 
-    className={`post-action ${post.shared ? 'shared' : ''}`}
-    onClick={() => handleSharePost(post._id)}
-  >
-    <ShareAltOutlined />
-    <span>{post.shares}</span>
-  </div>
-  {/* Edit/Delete for author */}
-  {user && post.author && (post.author._id ? post.author._id === user._id : post.author === user._id) && (
-    <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-      <Button size="small" onClick={() => handleEditPost(post)} style={{ marginRight: 4 }}>
-        Edit
-      </Button>
-      <Button size="small" danger onClick={() => handleDeletePost(post._id)}>
-        Delete
-      </Button>
-    </div>
-  )}
-</div>
-                  </div>
-                );
-              })}
+  let authorObj = post.author;
+  if (authorObj && typeof authorObj === 'string') {
+    if (!window._userCache) window._userCache = {};
+    if (!window._userCache[authorObj]) {
+      getUser(authorObj).then(res => {
+        window._userCache[authorObj] = res.data;
+        setMyPosts(posts => [...posts]);
+      }).catch(() => {
+        window._userCache[authorObj] = { username: 'Unknown' };
+      });
+      authorObj = { username: 'Loading...' };
+    } else {
+      authorObj = window._userCache[authorObj];
+    }
+  }
+  return (
+    <PostCard
+      key={post._id}
+      post={post}
+      authorObj={authorObj}
+      onEdit={handleEditPost}
+      onDelete={handleDeletePost}
+      formatTime={formatTime}
+      getStatusTag={getStatusTag}
+    />
+  );
+})}
+
             </div>
           </>
         );
@@ -691,131 +685,22 @@ const UserPage = () => {
               <MessageOutlined style={{ marginRight: 8 }} />
               <Title level={4} style={{ margin: 0 }}>Messages</Title>
             </div>
-            {selectedFriend ? (
-              <>
-                <Button onClick={() => setSelectedFriend(null)} style={{ marginBottom: 12 }}>Back to users</Button>
-                <div className="chat-header">
-                  <Avatar src={selectedFriend.avatar} icon={<UserOutlined />} />
-                  <Title level={5} style={{ margin: 0, marginLeft: 12 }}>
-                    {selectedFriend.username}
-                  </Title>
-                </div>
-                <div ref={chatBoxRef} className="chat-box">
-                  {chatLoading ? (
-                    <div className="flex-center">
-                      <Spin />
-                    </div>
-                  ) : chatMessages.length > 0 ? (
-                    chatMessages.map((msg, idx) => {
-                      const isSender = msg.senderId === user._id;
-                      return (
-                        <div key={msg._id || idx} className="chat-message">
-                          <div className={`chat-bubble ${isSender ? 'chat-bubble-sender' : 'chat-bubble-receiver'}`}>
-                            <span className="chat-message-content">{msg.content}</span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="flex-center">
-                      <Text type="secondary">Start a conversation!</Text>
-                    </div>
-                  )}
-                </div>
-                <div className="chat-input-row">
-                  <textarea
-                    className="chat-input-box"
-                    value={chatInput}
-                    onChange={e => setChatInput(e.target.value)}
-                    placeholder="Type a message..."
-                  />
-                  <Button
-  type="primary"
-  icon={<SendOutlined style={{ fontSize: 20 }} />}
-  onClick={handleSendMessage}
-  className="chat-send-btn"
-  disabled={!chatInput.trim()}
-  style={{ marginLeft: 8, minWidth: 40, minHeight: 40, borderRadius: 20, boxShadow: '0 2px 8px rgba(59,130,246,0.10)' }}
+            <MessagesSection
+  selectedFriend={selectedFriend}
+  setSelectedFriend={setSelectedFriend}
+  chatMessages={chatMessages}
+  chatInput={chatInput}
+  setChatInput={setChatInput}
+  chatLoading={chatLoading}
+  handleSendMessage={handleSendMessage}
+  loadingUsers={loadingUsers}
+  usersError={usersError}
+  friends={friends}
+  allUsers={allUsers}
+  unreadCounts={unreadCounts}
+  lastMessages={lastMessages}
+  user={user}
 />
-                </div>
-              </>
-            ) : (
-              <div className="users-list">
-                {loadingUsers ? (
-                  <div className="flex-center"><Spin /></div>
-                ) : usersError && friends.length > 0 ? (
-                  <div>
-                    <div className="flex-center" style={{ marginBottom: 16 }}><Text type="danger">{usersError} Showing friends only.</Text></div>
-                    <div className="friends-list">
-                      {friends.map(u => (
-                        <Card
-                          key={u._id}
-                          className="friend-card"
-                          hoverable
-                          onClick={() => setSelectedFriend(u)}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <Avatar src={u.avatar || undefined} icon={<UserOutlined />} size={40} />
-                            <div>
-                              <div style={{ fontWeight: 500 }}>{u.username}</div>
-                              <div style={{ fontSize: 13, color: '#64748b' }}>{u.email}</div>
-                            </div>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                ) : usersError && friends.length === 0 ? (
-                  <div className="flex-center"><Text type="danger">{usersError} No friends available.</Text></div>
-                ) : allUsers.length === 0 ? (
-                  <div className="flex-center"><Text type="secondary">No users found.</Text></div>
-                ) : (
-                  <div className="friends-list">
-                    {friends.map(u => (
-  <Card
-    key={u._id}
-    className="friend-card"
-    hoverable
-    onClick={() => setSelectedFriend(u)}
-    style={{ cursor: 'pointer' }}
-  >
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <Avatar src={u.avatar || undefined} icon={<UserOutlined />} size={40} />
-      <div>
-        <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
-  {u.username}
-  {unreadCounts[u._id] > 0 && (
-    <span className="chat-unread-badge">New msg ({unreadCounts[u._id]})</span>
-  )}
-</div>
-<div style={{ fontSize: 13, color: '#64748b' }}>{u.email}</div>
-        <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-          {lastMessages[u._id]?.content ? (
-  <>
-    
-    <span style={{ fontWeight: 500 }}>
-      {lastMessages[u._id].sender === user._id
-        ? 'you: '
-        : u.username + ': '
-      }
-    </span>
-    {lastMessages[u._id].content.length > 40
-      ? lastMessages[u._id].content.slice(0, 40) + '...'
-      : lastMessages[u._id].content}
-  </>
-) : (
-  <span style={{ fontStyle: 'italic', color: '#bbb' }}>No messages yet</span>
-)}
-        </div>
-      </div>
-    </div>
-  </Card>
-))}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         );
 
@@ -830,14 +715,8 @@ const UserPage = () => {
             ) : friends.length > 0 ? (
               <div className="friends-list">
                 {friends.map(friend => (
-                  <Card key={friend._id} className="friend-card">
-                    <Card.Meta
-                      avatar={<Avatar src={friend.avatar} icon={<UserOutlined />} />}
-                      title={friend.username}
-                      description={friend.email}
-                    />
-                  </Card>
-                ))}
+  <UserCard key={friend._id} user={friend} />
+))}
               </div>
             ) : (
               <div className="flex-center" style={{ padding: 40 }}>
@@ -904,23 +783,12 @@ const UserPage = () => {
           <div className="user-search-section">
             <Title level={4}>Discover People</Title>
             <div className="user-search-row">
-              <input
-                className="user-search-input"
-                type="text"
-                placeholder="Search for users..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
+              <SearchBar 
+                search={search}
+                setSearch={setSearch}
+                handleSearch={handleSearch}
+                searching={searching}
               />
-              <Button 
-                type="primary" 
-                className="user-search-btn" 
-                onClick={handleSearch}
-                loading={searching}
-                icon={<SearchOutlined />}
-              >
-                Search
-              </Button>
             </div>
             {results.length > 0 && (
               <div className="search-results">
@@ -983,24 +851,29 @@ const UserPage = () => {
 
   if (!user) return null;
 
+
   return (
     <>
-      <Navbar 
-        isAdmin={user.role === 'admin'} 
-        onLogout={handleLogout} 
+      <Navbar
+        isAdmin={user.role === 'admin'}
+        onLogout={handleLogout}
         username={user.username}
+        onNavigate={user.role !== 'admin' ? handleNavbarNavigate : undefined}
       />
   
-      <div className="user-main">
-        {/* Left Sidebar */}
-        <div className="left-sidebar">
+      <div className="user-main" style={{marginTop: 64}}>
+
+         {/* Left Sidebar */}
+         <div className="left-sidebar">
           {/* Profile Card */}
-          <div className="profile-card">
+          <div ref={profileRef} className="profile-card">
             <Avatar 
               size={90} 
-              src={user.avatar} 
+              src={resolveAvatarUrl(user?.avatar)} 
               icon={<UserOutlined />} 
               className="profile-avatar"
+              style={{ cursor: 'pointer' }}
+              onClick={() => setActiveNav('profile')}
             />
             <div className="profile-info">
               <Title level={3} className="profile-title">{user.username}</Title>
@@ -1022,11 +895,11 @@ const UserPage = () => {
           </div>
   
           {/* Navigation Menu */}
-          {renderNavigation()}
-        </div>
-  
-        {/* Main Content */}
-        <div className="main-content">
+           {renderNavigation()}
+         </div>
+
+         {/* Main Content */}
+         <div className="main-content">
           {renderMainContent()}
         </div>
   

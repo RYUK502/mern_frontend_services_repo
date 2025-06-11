@@ -1,0 +1,18 @@
+/* MessagesSection.css - extracted from inline styles */
+
+.chat-header-icon {
+  margin-right: 8px;
+}
+
+.chat-header-title {
+  margin: 0;
+}
+
+.back-to-users-btn {
+  margin-bottom: 12px;
+}
+
+.selected-friend-title {
+  margin: 0;
+  margin-left: 12px;
+}

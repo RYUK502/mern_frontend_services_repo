@@ -1,5 +1,17 @@
 /* UserPage.css - Professional Social Media Design */
 
+/* Utility Classes for Refactored Inline Styles */
+.padding-40 {
+  padding: 40px !important;
+}
+.height-300 {
+  height: 300px !important;
+}
+.mr-8 {
+  margin-right: 8px !important;
+}
+
+
 /* Base Styles */
 * {
   box-sizing: border-box;

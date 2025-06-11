@@ -13,6 +13,8 @@ const {
   getUserFriends // Assuming you have this for GET /:id/friends
 } = require('../controllers/userController');
 const { verifyToken } = require('../middleware/authMiddleware');
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' });
 
 // Define routes
 router.get('/', verifyToken, getAllUsers);
@@ -20,6 +22,7 @@ router.get('/search', verifyToken, searchUsers);
 router.get('/:id', verifyToken, getUser);
 router.get('/:id/friends', verifyToken, getUserFriends);
 router.put('/me', verifyToken, updateProfile);
+router.post('/me/avatar', verifyToken, upload.single('avatar'), require('../controllers/userController').updateAvatar);
 router.post('/friend-request/:targetId', verifyToken, sendFriendRequest);
 router.post('/friend-request/:targetId/accept', verifyToken, acceptFriendRequest);
 router.post('/friend-request/:targetId/reject', verifyToken, rejectFriendRequest);

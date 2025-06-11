@@ -1,5 +1,25 @@
-const User = require('../models/User');
 const mongoose = require('mongoose');
+const User = require('../models/User');
+
+exports.updateAvatar = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+    // You may want to use a real public URL in production
+    const baseUrl = req.protocol + '://' + req.get('host');
+    const avatarUrl = `${baseUrl}/uploads/${req.file.filename}`;
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { avatar: avatarUrl },
+      { new: true }
+    ).select('-password');
+    console.log('[UPDATE AVATAR] user.avatar:', user.avatar);
+    res.json({ avatar: user.avatar });
+  } catch (err) {
+    console.error('Error in updateAvatar:', err);
+    res.status(500).json({ message: 'Failed to update avatar' });
+  }
+};
+
 
 exports.getAllUsers = async (req, res) => {
   try {
@@ -39,12 +59,26 @@ exports.getUser = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
   try {
-    const { bio, avatar } = req.body;
+    let { username, email, bio, avatar } = req.body;
+    const updateFields = {};
+    if (username) updateFields.username = username;
+    if (email) updateFields.email = email;
+    if (bio !== undefined) updateFields.bio = bio;
+    if (avatar !== undefined) {
+      // If avatar is not a full URL, prepend base URL
+      if (avatar && !avatar.startsWith('http')) {
+        const baseUrl = req.protocol + '://' + req.get('host');
+        avatar = `${baseUrl}${avatar.startsWith('/') ? '' : '/'}${avatar}`;
+      }
+      updateFields.avatar = avatar;
+    }
+
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { bio, avatar },
+      updateFields,
       { new: true }
-    ).select('-email');
+    ).select('-password'); // Exclude password from response
+    console.log('[UPDATE PROFILE] user.avatar:', user.avatar);
     res.json(user);
   } catch (err) {
     console.error('Error in updateProfile:', err);

@@ -11,6 +11,15 @@
   margin-bottom: 2rem;
   z-index: 100;
 }
+.navbar-home-icon {
+  font-size: 22px;
+  margin-right: 8px;
+}
+
+.navbar-user-icon {
+  margin-right: 4px;
+}
+
 .navbar-logo {
   display: flex;
   align-items: center;
